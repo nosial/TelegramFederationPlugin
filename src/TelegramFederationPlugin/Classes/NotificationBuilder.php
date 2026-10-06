@@ -225,7 +225,7 @@
                         $line .= ' of ' . self::entityHtml($blacklist->getEntityUuid());
                     }
 
-                    $notification->addHtmlLine($line . ', ' . self::expiresHtml($blacklist->getExpires()));
+                    $notification->addHtmlLine($line . ', ' . ($blacklist->getExpires() === null ? '' : 'expires ') . self::expiresHtml($blacklist->getExpires()));
                     $notification->addRecordButton('View Blacklist', RecordType::BLACKLIST, $blacklist->getUuid());
                 }
             }
@@ -571,14 +571,14 @@
         }
 
         /**
-         * Returns the expiration of a blacklist record
+         * Returns the expiration of a blacklist record, the time it expires at or permanent
          *
          * @param int|null $expires The Unix timestamp the blacklist record expires at, null if it's permanent
          * @return string The HTML
          */
         private static function expiresHtml(?int $expires): string
         {
-            return $expires === null ? '<b>permanent</b>' : 'expires ' . Html::time($expires);
+            return $expires === null ? '<b>permanent</b>' : Html::time($expires);
         }
 
         /**
