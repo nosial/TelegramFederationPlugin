@@ -114,7 +114,7 @@
 
         protected function getNotificationHint(): string
         {
-            return 'The test environment must be started with the same test chat as the tests, "make test-env" takes TELEGRAM_TEST_BOT_TOKEN and TELEGRAM_TEST_CHAT_ID from the environment or phpunit.xml, run it again if they were set after it was started.';
+            return 'The test environment must be started with the same test chat as the tests, "make test-env" takes TELEGRAM_TEST_BOT_TOKEN and TELEGRAM_TEST_CHAT_ID from the environment or phpunit.xml, run it again if they were set after it was started. The plugin also drops a notification Telegram rate limits (HTTP 429), eg; while another test run uses the same test chat, see the log of the server.';
         }
 
         private static function getServerEndpoint(): string

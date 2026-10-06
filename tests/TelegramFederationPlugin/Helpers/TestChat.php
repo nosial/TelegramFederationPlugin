@@ -13,6 +13,12 @@
         /** @var float[] The times of the messages sent to the chat in the last minute */
         private static array $sentTimes = [];
         private static ?int $lastMarker = null;
+        /** @var int|null The ID of the last message known to be sent to the chat */
+        private static ?int $lastMessageId = null;
+        /** @var int The messages others (eg; the plugin) were expected to send, already counted by wait() */
+        private static int $expectedOthers = 0;
+        /** @var array<int, true> The IDs of the messages sent by the tests themselves (markers and forwarded copies) */
+        private static array $ownMessages = [];
 
         public static function isConfigured(): bool
         {
@@ -53,6 +59,7 @@
             }
 
             self::wait($messages);
+            self::$expectedOthers = $messages;
         }
 
         public static function capture(callable $operation, int $expected=1): ?array
@@ -63,9 +70,10 @@
                 return null;
             }
 
-            // The markers, the expected messages and their forwarded copies
-            self::wait((self::$lastMarker === null ? 2 : 1) + $expected * 2);
+            // The markers and the expected messages, their forwarded copies are counted when they're read
+            self::wait((self::$lastMarker === null ? 2 : 1) + $expected);
             $before = self::$lastMarker ?? self::sendMarker();
+            self::$expectedOthers = $expected;
 
             try
             {
@@ -75,11 +83,20 @@
             {
                 $after = self::sendMarker();
                 self::$lastMarker = $after;
+                self::$expectedOthers = 0;
             }
 
             $texts = [];
-            for($messageId = $before + 1; $messageId < $after && $messageId <= $before + self::MAX_CAPTURED; $messageId++)
+            $read = 0;
+            for($messageId = $before + 1; $messageId < $after && $read < self::MAX_CAPTURED; $messageId++)
             {
+                // The forwarded copies of the previous capture are already deleted
+                if(isset(self::$ownMessages[$messageId]))
+                {
+                    continue;
+                }
+
+                $read++;
                 $text = self::read($messageId);
                 if($text !== null)
                 {
@@ -93,6 +110,7 @@
 
         private static function read(int $messageId): ?string
         {
+            self::wait(1);
             $forwarded = self::request('forwardMessage', array_merge(self::getTarget(), [
                 'from_chat_id' => self::getChatId(),
                 'message_id' => $messageId,
@@ -104,6 +122,7 @@
                 return null;
             }
 
+            self::observe((int)$forwarded['message_id']);
             self::deleteMessage((int)$forwarded['message_id']);
             return (string)($forwarded['text'] ?? $forwarded['caption'] ?? '');
         }
@@ -129,7 +148,36 @@
                 });
             }
 
+            self::observe((int)$message['message_id']);
             return (int)$message['message_id'];
+        }
+
+        /**
+         * Counts the messages sent to the chat since the last message the tests know of, the IDs of the messages of a
+         * chat are sequential. Telegram limits the messages of a chat regardless of who sends them, the messages the
+         * plugin sends while a test is set up (eg; REPORT_CREATED by submitReport()) or that another test run sends to
+         * the same chat must be counted too, the plugin drops a notification Telegram rate limits.
+         *
+         * @param int $messageId The ID of a message the tests sent
+         * @return void
+         */
+        private static function observe(int $messageId): void
+        {
+            self::$ownMessages[$messageId] = true;
+
+            if(self::$lastMessageId !== null && $messageId > self::$lastMessageId + 1)
+            {
+                $others = $messageId - self::$lastMessageId - 1;
+                $uncounted = max(0, $others - self::$expectedOthers);
+                self::$expectedOthers = max(0, self::$expectedOthers - $others);
+
+                for($i = 0; $i < $uncounted; $i++)
+                {
+                    self::$sentTimes[] = microtime(true);
+                }
+            }
+
+            self::$lastMessageId = max(self::$lastMessageId ?? $messageId, $messageId);
         }
 
         private static function deleteMessage(int $messageId): void
