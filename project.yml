@@ -1,9 +1,17 @@
 source: src
 default_build: release
+update_source: nosial/telegram_federation_plugin@n64
+repository:
+  name: n64
+  type: github
+  host: git.n64.cc
+  ssl: true
 assembly:
   name: TelegramFederationPlugin
   package: net.nosial.telegram_federation_plugin
   version: 1.0.0
+dependencies:
+  net.nosial.federation: nosial/federationlib@github
 build_configurations:
   -
     name: debug
@@ -11,7 +19,30 @@ build_configurations:
     type: ncc
     definitions:
       NCC_DEBUG: true
+    options:
+      federationlib: &federationlib
+        # The plugin listens on every event, which of them are sent to Telegram is decided by the plugin's own
+        # configuration (telegram_federation_plugin) so that it can be changed without rebuilding the plugin
+        event_handlers:
+          # Audit log entries, eg; REPORT_CLOSED or ENTITY_BLACKLISTED
+          -
+            event: AUDIT_LOG
+            class: \TelegramFederationPlugin\Handlers\AuditLogHandler::class
+          # Changes written to the database, eg; REPORT_CREATED or BLACKLIST_LIFTED
+          -
+            event: RECORD_CHANGE
+            class: \TelegramFederationPlugin\Handlers\RecordChangeHandler::class
+          # Content scan requests (POST /scan)
+          -
+            event: CONTENT_SCAN
+            class: \TelegramFederationPlugin\Handlers\ContentScanHandler::class
+          # Query entity requests (GET /entities/{identifier}/query)
+          -
+            event: QUERY_ENTITY
+            class: \TelegramFederationPlugin\Handlers\QueryEntityHandler::class
   -
     name: release
     output: 'target/release/${ASSEMBLY.PACKAGE}.ncc'
     type: ncc
+    options:
+      federationlib: *federationlib
