@@ -1,0 +1,70 @@
+name: telegram-federation-plugin-test
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      # FederationLib (SERVER_ENDPOINT)
+      - "${FEDERATION_PORT:-7000}:7000"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # FederationLib Configuration
+      - FEDERATION_DATABASE_HOST=mariadb
+      - FEDERATION_DATABASE_PORT=3306
+      - FEDERATION_DATABASE_USERNAME=federation
+      - FEDERATION_DATABASE_PASSWORD=federation
+      - FEDERATION_DATABASE_NAME=federation
+      - FEDERATION_REDIS_ENABLED=true
+      - FEDERATION_REDIS_HOST=redis
+      - FEDERATION_REDIS_PORT=6379
+      - FEDERATION_ACCESS_TOKEN=${FEDERATION_ACCESS_TOKEN:-abcdefghijklmnopqrstuvwxyz123456}
+      # Installed by docker-entrypoint.sh before `federationlib init`
+      - REQUIRE_PLUGINS=/opt/federationlib/plugins/net.nosial.telegram_federation_plugin.ncc
+      # The plugins FederationLib loads
+      - FEDERATION_PLUGINS=net.nosial.telegram_federation_plugin
+      # The plugin's own configuration. The notifications are sent to the test chat of TELEGRAM_TEST_BOT_TOKEN and
+      # TELEGRAM_TEST_CHAT_ID (GitHub/Forgejo secrets in CI), without them the plugin is installed but sends nothing
+      - TELEGRAM_FEDERATION_PLUGIN_BOT_TOKEN=${TELEGRAM_TEST_BOT_TOKEN:-}
+      - TELEGRAM_FEDERATION_PLUGIN_CHAT_ID=${TELEGRAM_TEST_CHAT_ID:-}
+      - TELEGRAM_FEDERATION_PLUGIN_TOPIC_ID=${TELEGRAM_TEST_TOPIC_ID:-}
+      - TELEGRAM_FEDERATION_PLUGIN_DISABLE_NOTIFICATION=true
+      # Every event is sent so that every handler runs, Telegram only accepts public URLs in buttons
+      - TELEGRAM_FEDERATION_PLUGIN_AUDIT_LOGS=*
+      - TELEGRAM_FEDERATION_PLUGIN_RECORD_CHANGES=*
+      - TELEGRAM_FEDERATION_PLUGIN_CONTENT_SCANS=true
+      - TELEGRAM_FEDERATION_PLUGIN_ENTITY_QUERIES=true
+      - TELEGRAM_FEDERATION_PLUGIN_FEDERATION_WEB=https://example.com/
+
+  mariadb:
+    image: mariadb:10.5
+    environment:
+      MYSQL_ROOT_PASSWORD: federation_root
+      MYSQL_DATABASE: federation
+      MYSQL_USER: federation
+      MYSQL_PASSWORD: federation
+    expose:
+      - "3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "federation", "-pfederation"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  redis:
+    image: redis:alpine
+    command: redis-server
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
