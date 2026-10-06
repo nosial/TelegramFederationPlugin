@@ -232,6 +232,14 @@
                 $body = curl_exec($handle);
                 if($body === false)
                 {
+                    // Connections to Telegram are occasionally reset, the request is retried. A message may have been
+                    // sent anyway, a duplicated marker is read as any other message of the chat
+                    if($attempt < 5)
+                    {
+                        sleep($attempt);
+                        continue;
+                    }
+
                     // The URL contains the bot token, it's never included
                     throw new RuntimeException(sprintf('The Telegram %s request failed: %s', $method, curl_error($handle)));
                 }
