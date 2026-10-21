@@ -1,4 +1,4 @@
-# TelegramFederationPlugin
+# <picture><source media="(prefers-color-scheme: dark)" srcset="assets/icon/telegramfederationplugin_light.svg"><img src="assets/icon/telegramfederationplugin_dark.svg" alt="TelegramFederationPlugin" width="32" height="32"></picture> TelegramFederationPlugin
 
 A [FederationLib](https://git.n64.cc/nosial/federationlib) plugin that sends FederationLib's events to a Telegram chat
 (and optionally a forum topic), such as reports being created or closed, entities being blacklisted or evidence being

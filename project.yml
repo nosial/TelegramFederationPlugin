@@ -9,7 +9,14 @@ repository:
 assembly:
   name: TelegramFederationPlugin
   package: net.nosial.telegram_federation_plugin
-  version: 1.0.0
+  version: 1.0.1
+  url: 'https://github.com/nosial/TelegramFederationPlugin'
+  license: 'MIT'
+  description: 'A plugin for FederationLib to send Telegram notifications from FederationLib'
+  author: 'Netkas <netkas@nosial.net>'
+  organization: 'Nosial'
+  product: 'Federation'
+  copyright: 'Copyright (c) 2022-2026 Nosial'
 dependencies:
   net.nosial.federation: nosial/federationlib@github
 build_configurations:
