@@ -8,7 +8,7 @@ classified. Notifications can contain inline buttons that open the records in a
 ## Table of contents
 
 <!-- TOC -->
-* [<picture><source media="(prefers-color-scheme: dark)" srcset="assets/icon/telegramfederationplugin_light.svg"><img src="assets/icon/telegramfederationplugin_dark.svg" alt="TelegramFederationPlugin" width="32" height="32"></picture> TelegramFederationPlugin](#picturesource-mediaprefers-color-scheme-dark-srcsetassetsicontelegramfederationplugin_lightsvgimg-srcassetsicontelegramfederationplugin_darksvg-alttelegramfederationplugin-width32-height32picture-telegramfederationplugin)
+* [TelegramFederationPlugin](#telegramfederationplugin)
   * [Table of contents](#table-of-contents)
   * [What it does](#what-it-does)
     * [Inline buttons](#inline-buttons)
