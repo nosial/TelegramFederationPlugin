@@ -1,6 +1,6 @@
 source: src
 default_build: release
-update_source: nosial/telegram_federation_plugin@n64
+update_source: nosial/telegramfederationplugin@n64
 repository:
   name: n64
   type: github
