@@ -128,9 +128,9 @@ jobs:
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
     if: needs.check-phpunit.outputs.phpunit-exists == 'true'
-    # The Telegram test chat the notifications are sent to, by the tests and by the plugin in the test environment
-    # (docker-compose.yml). Use a bot and a chat that only exist for testing, the tests that need them are skipped
-    # without them (eg; on forks, which don't get the secrets)
+    concurrency:
+      group: ${{ github.repository }}-telegram-test-chat
+      cancel-in-progress: false
     env:
       TELEGRAM_TEST_BOT_TOKEN: ${{ secrets.TELEGRAM_TEST_BOT_TOKEN }}
       TELEGRAM_TEST_CHAT_ID: ${{ secrets.TELEGRAM_TEST_CHAT_ID }}
