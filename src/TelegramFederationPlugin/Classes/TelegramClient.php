@@ -14,6 +14,7 @@
         private const int MAX_MESSAGE_LENGTH = 4000;
         private const int CONNECT_TIMEOUT_MS = 3000;
         private const int TIMEOUT_MS = 5000;
+        private const int RATE_LIMIT_RATELIMIT = 30;
         private ?CurlHandle $handle = null;
         /** @var array<string, true> */
         private array $failedTargets = [];
@@ -58,17 +59,23 @@
                 return false;
             }
 
+            $until = RatelimitHandler::until($this->getTargetKey());
+            if($until !== null)
+            {
+                Logger::log()->debug(sprintf('Telegram rate limits the bot for %d more second(s), the "%s" notification is dropped', max(1, $until - time()), $notification->getTitle()));
+                return false;
+            }
+
             $html = $notification->getText();
             $keyboard = $notification->getInlineKeyboard();
 
             if(Html::visibleLength($html) > self::MAX_MESSAGE_LENGTH)
             {
-                // Cutting HTML may break its tags, a message that is too long is sent as truncated plain text instead
-                [$status, $description] = $this->sendMessage(Html::truncate(Html::toPlainText($html), self::MAX_MESSAGE_LENGTH), $keyboard, false);
+                [$status, $description, $retryAfter] = $this->sendMessage(Html::truncate(Html::toPlainText($html), self::MAX_MESSAGE_LENGTH), $keyboard, false);
             }
             else
             {
-                [$status, $description] = $this->sendMessage($html, $keyboard, true);
+                [$status, $description, $retryAfter] = $this->sendMessage($html, $keyboard, true);
             }
 
             // Telegram rejects messages it can't parse, and buttons with URLs it doesn't accept (eg; a local address)
@@ -76,7 +83,7 @@
             if($status === 400)
             {
                 Logger::log()->warning(sprintf('Telegram rejected the "%s" notification (%s), retrying as plain text without buttons', $notification->getTitle(), $description ?? 'no description'));
-                [$status, $description] = $this->sendMessage(Html::truncate(Html::toPlainText($html), self::MAX_MESSAGE_LENGTH), [], false);
+                [$status, $description, $retryAfter] = $this->sendMessage(Html::truncate(Html::toPlainText($html), self::MAX_MESSAGE_LENGTH), [], false);
             }
 
             if($status !== null && $status >= 200 && $status < 300)
@@ -84,9 +91,22 @@
                 return true;
             }
 
-            // Transport failures and client errors (invalid token, chat or topic) will not resolve themselves, rate
-            // limits (429) and server errors (5xx) only drop the current notification
-            if($status === null || ($status >= 400 && $status < 500 && $status !== 429))
+            if($status === 429)
+            {
+                $seconds = $retryAfter ?? self::RATE_LIMIT_RATELIMIT;
+                if(RatelimitHandler::start($this->getTargetKey(), $seconds))
+                {
+                    Logger::log()->warning(sprintf('Telegram rate limited the bot (%s), notifications are dropped for %d second(s)', $description ?? 'HTTP 429', $seconds));
+                }
+                else
+                {
+                    Logger::log()->debug(sprintf('Telegram rate limits the bot, the "%s" notification is dropped', $notification->getTitle()));
+                }
+
+                return false;
+            }
+
+            if($status === null || ($status >= 400 && $status < 500))
             {
                 $this->failedTargets[$this->getTargetKey()] = true;
                 Logger::log()->error(sprintf('Unable to send the "%s" notification to Telegram (%s), no further notifications are sent by this process', $notification->getTitle(), $description ?? sprintf('HTTP %s', $status ?? 'request failed')));
@@ -113,7 +133,7 @@
                 $handle = curl_init();
                 if($handle === false)
                 {
-                    return [null, 'cURL could not be initialized'];
+                    return [null, 'cURL could not be initialized', null];
                 }
 
                 curl_setopt($handle, CURLOPT_POST, true);
@@ -149,7 +169,7 @@
             $body = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
             if($body === false)
             {
-                return [null, 'The message could not be encoded'];
+                return [null, 'The message could not be encoded', null];
             }
 
             // The URL contains the bot token, it must never be logged
@@ -161,14 +181,16 @@
             {
                 $error = curl_error($this->handle);
                 $this->handle = null;
-                return [null, $error !== '' ? $error : 'The request failed'];
+                return [null, $error !== '' ? $error : 'The request failed', null];
             }
 
             $status = (int)curl_getinfo($this->handle, CURLINFO_RESPONSE_CODE);
             $decoded = is_string($response) ? json_decode($response, true) : null;
             $description = is_array($decoded) && isset($decoded['description']) && is_string($decoded['description']) ? $decoded['description'] : null;
+            $retryAfter = is_array($decoded) && isset($decoded['parameters']['retry_after']) && is_int($decoded['parameters']['retry_after']) && $decoded['parameters']['retry_after'] > 0
+                ? $decoded['parameters']['retry_after'] : null;
 
-            return [$status, $description];
+            return [$status, $description, $retryAfter];
         }
 
         /**
@@ -176,7 +198,7 @@
          *
          * @return string The target key
          */
-        private function getTargetKey(): string
+        public function getTargetKey(): string
         {
             return hash('sha256', sprintf('%s|%s|%s|%s', Configuration::getApiEndpoint(), Configuration::getBotToken(), Configuration::getChatId(), Configuration::getTopicId() ?? ''));
         }
