@@ -166,6 +166,44 @@
             $this->assertTrue(new TelegramClient()->send($notification));
         }
 
+        public function testNothingIsSentWhileRateLimited(): void
+        {
+            $this->configureUnreachableTelegram();
+            $client = new TelegramClient();
+            RatelimitHandler::start($client->getTargetKey(), 60);
+
+            try
+            {
+                // A request would fail on the unreachable target and disable it, the client stays available
+                $this->assertFalse($client->send($this->notification()));
+                $this->assertTrue($client->isAvailable());
+            }
+            finally
+            {
+                RatelimitHandler::clear($client->getTargetKey());
+            }
+        }
+
+        public function testRateLimitOnlyCoversItsTarget(): void
+        {
+            $this->configureUnreachableTelegram();
+            $client = new TelegramClient();
+            RatelimitHandler::start($client->getTargetKey(), 60);
+            $limited = $client->getTargetKey();
+
+            try
+            {
+                PluginConfiguration::apply(array_merge($this->unreachableTelegram, ['chat_id' => TestData::chatId()]));
+
+                $this->assertNotSame($limited, $client->getTargetKey());
+                $this->assertNull(RatelimitHandler::until($client->getTargetKey()));
+            }
+            finally
+            {
+                RatelimitHandler::clear($limited);
+            }
+        }
+
         private function notification(): Notification
         {
             return new Notification(uniqid('Notification '), ['TEST', 'TELEGRAM_FEDERATION_PLUGIN'], 'TelegramFederationPlugin Tests');
