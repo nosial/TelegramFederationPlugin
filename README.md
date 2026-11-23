@@ -98,8 +98,14 @@ Telegram (3 seconds to connect, 5 seconds at most). A notification that can't be
 operation it is about.
 
 Like LogLib2's Telegram handler, a target that fails in a way that won't resolve itself (an invalid bot token, chat or
-topic, or Telegram being unreachable) isn't tried again for the rest of the process. Rate limits (`429`) and Telegram
-server errors only drop the notification they happened to.
+topic, or Telegram being unreachable) isn't tried again for the rest of the process. Telegram server errors only drop
+the notification they happened to.
+
+When Telegram rate limits the bot (`429`), notifications to that bot, chat and topic are dropped without a request for as
+long as Telegram asked (its `retry_after`, 30 seconds if it didn't say), and the rate limit is logged once as a warning;
+the notifications dropped meanwhile are only logged for debugging. The rate limit is shared by every process through
+FederationLib's Redis cache when it's enabled (`FEDERATION_REDIS_*`), otherwise through APCu (outside the CLI), and
+otherwise it only covers the process that ran into it.
 
 ## Configuration
 
