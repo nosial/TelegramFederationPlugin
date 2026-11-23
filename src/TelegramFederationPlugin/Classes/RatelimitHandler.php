@@ -157,7 +157,7 @@
         {
             if(self::$redisFailedAt === 0)
             {
-                Logger::log()->debug('Cooldowns are not shared through Redis: ' . $e->getMessage());
+                Logger::log()->debug('Ratelimits are not shared through Redis: ' . $e->getMessage());
             }
 
             self::$redisFailedAt = time();
